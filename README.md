@@ -55,6 +55,7 @@
 - **系统能力适配**：45 个 ArkTS Adapter 覆盖窗口、通知、剪贴板、分享、文件选择器、权限、证书、显示、蓝牙、输入等，配 44 个 ipc 桥
 - **原生模块**：上游 4 个 Rust napi 模块（播放 / 采集 / 媒体控制 / SQLite）用鸿蒙交叉工具链重编为 arm64-v8a
 - **日志**：统一 `LogUtil` 封装 `hilog`，`console.*` 已清零
+- **版本落差**：上游按 Electron 43.x API 编写，实际容器是 Electron 34.x（Chromium 132），34 之后新增的 API 不可用
 
 ## 🛠️ 技术栈
 
@@ -63,7 +64,7 @@
 - **Application**: ArkTS + ArkUI 声明式
 - **SDK**: API 23（HarmonyOS 6.1.0）
 - **Build**: DevEco Studio 6.1.0 + hvigor + ohpm
-- **Runtime**: Electron 鸿蒙化运行时（Chromium 132，`libelectron.so`）
+- **Runtime**: Electron 鸿蒙化运行时（Electron 34.x · Chromium 132.0.6834.161，`libelectron.so`）
 - **Renderer**: ArkWeb `@kit.ArkWeb`
 - **Media**: `@kit.AVSessionKit` · `@kit.BackgroundTasksKit` · `@kit.DeskTopExtensionKit`
 - **Window**: `@kit.AbilityKit` · `@kit.WindowKit` · `@kit.BasicServicesKit`
@@ -75,7 +76,7 @@
 
 **上游侧（容器内原样运行，未改）**
 
-- **Desktop Shell**: [Electron](https://www.electronjs.org/) 43.7
+- **Desktop Shell**: [Electron](https://www.electronjs.org/) 43.x API（上游源码声明）
 - **Frontend**: [Vue 3.5](https://vuejs.org/) + [TypeScript 5.9](https://www.typescriptlang.org/)
 - **Build Tool**: [Vite](https://vite.dev/) 8 + esbuild
 - **State Management**: [Pinia](https://pinia.vuejs.org/) 3
