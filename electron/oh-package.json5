@@ -1,0 +1,12 @@
+{
+  "license": "GPL-3.0",
+  "devDependencies": {},
+  "author": "",
+  "name": "electron",
+  "description": "EchoMusic for HarmonyOS —— entry 模块（上游 https://github.com/hoowhoami/EchoMusic 的鸿蒙移植版）",
+  "main": "",
+  "version": "1.0.0",
+  "dependencies": {
+    "web_engine": 'file:../web_engine',
+  }
+}

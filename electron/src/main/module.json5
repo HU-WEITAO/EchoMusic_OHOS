@@ -1,0 +1,151 @@
+{
+  "module": {
+    "name": "electron",
+    "type": "entry",
+    "srcEntry": "./ets/Application/AbilityStage.ets",
+    "description": "$string:module_desc",
+    "mainElement": "EntryAbility",
+    // 设备类型必须包含 phone。仅声明 ["2in1","tablet"] 时系统会把本应用判定为
+    // 「PC 端应用」，窗口被归入 PC 应用窗口容器，回桌面只最小化窗口、不产生
+    // ability 退后台，媒体实况窗（状态栏胶囊）因此始终不显示。
+    "deviceTypes": [
+      "phone",
+      "tablet",
+      "2in1"
+    ],
+    "deliveryWithInstall": true,
+    "installationFree": false,
+    "pages": "$profile:main_pages",
+    "metadata": [
+      {
+        "name": "client_id",
+        "value": ""
+      }
+    ],
+    "requestPermissions": [
+      {
+        // 申请 AUDIO_PLAYBACK 长时任务（后台播放保活 + 媒体实况窗）所必需，
+        // 缺失时 startBackgroundRunning 直接报 201 Permission denied
+        "name": "ohos.permission.KEEP_BACKGROUND_RUNNING"
+      }
+    ],
+    "abilities": [
+      {
+        "name": "EntryAbility",
+        "srcEntry": "./ets/entryability/EntryAbility.ets",
+        "description": "$string:EntryAbility_desc",
+        "icon": "$media:app_icon",
+        "label": "$string:EntryAbility_label",
+        "startWindowIcon": "$media:startIcon",
+        "startWindowBackground": "$color:start_window_background",
+        "launchType": "specified",
+        "removeMissionAfterTerminate": true,
+        "continuable": true,
+        "exported": true,
+        // 显式声明窗口模式：全屏 + 分屏 + 自由窗口（悬浮窗）。
+        // 2026-09-19 恢复 floating。此前为让「媒体实况窗」在回桌面时正常出现，
+        // 这里刻意去掉了 floating，但代价在 2in1/PC 上等于「本应用不提供悬浮窗形态」：
+        //   1) 窗口只能以全屏/最大化启动（表现为「打开直接最大化」）；
+        //   2) 自绘标题栏的「最大化/还原」两个方向都产生不了视觉变化（表现为按钮失灵）。
+        // 恢复后系统会以自由窗口模式启动本应用。若验收时发现实况窗不再出现，
+        // 用同目录 module.json5.bak-nosplit 回退，并改用 README「六、易踩的坑」里的备选方案。
+        "supportWindowMode": ["fullscreen", "split", "floating"],
+        // ── 自由窗口（悬浮窗 / 全景多窗 / 分屏）尺寸与比例限制 ───────────────────
+        // 这些字段只约束"自由窗口能被拖成多大 / 什么形状"，不影响力化的全屏、
+        // 最大化和平板常规（全屏）模式；单位全部是 vp（不是 px）。
+        // 生效优先级：运行期 setWindowLimits() > StartOptions > 本文件 > 系统默认。
+        //
+        // 为什么要限制比例：本应用是 WebView 壳，页面按窗口宽度做响应式排布，
+        // 窗口被拖成极窄高或极扁宽的条状时整体布局会错位（侧边栏被挤扁、内容溢出）。
+        //   · minWindowRatio = 宽 ÷ 高的**下限** = 1.0 → 不允许出现"高于宽"的竖条窗口；
+        //   · maxWindowRatio = 宽 ÷ 高的**上限** = 2.5 → 允许横向拉宽，但挡住最扁的极端形状。
+        // 未显式给出的 maxWindowWidth / maxWindowHeight 保持系统默认（不设上限）。
+        //
+        // ★ 调参入口就在这里，改完重编即可，不需要动代码。
+        //   若发现平板"左右分屏"被限制住 —— 横屏对半分出来的窗口比例约 0.75，低于
+        //   下限 1.0 —— 把 minWindowRatio 下调到 0.7 ~ 0.75 即可。
+        "minWindowWidth": 640,
+        "minWindowHeight": 400,
+        "minWindowRatio": 1.0,
+        "maxWindowRatio": 2.5,
+        // 后台音频播放模式：系统据此为活跃 AVSession 激活媒体实况窗（锁屏/状态栏胶囊）
+        "backgroundModes": ["audioPlayback"],
+        "skills": [
+          {
+            "entities": [
+              "entity.system.home",
+              "entity.system.browsable"
+            ],
+            "actions": [
+              "action.system.home",
+              "ohos.want.action.viewData"
+            ],
+            "uris": []
+          },
+          {
+            "actions": [
+              "ohos.want.action.viewData"
+            ],
+            "uris": [
+              {
+                "scheme": "link"
+              }
+            ]
+          }
+        ],
+        "metadata": [
+          {
+            "name": "ohos.ability.shortcuts",
+            "resource": "$profile:shortcuts_config"
+          },
+        ],
+      },
+      {
+        "name": "BrowserAbility",
+        "srcEntry": "./ets/entryability/BrowserAbility.ets",
+        "description": "$string:BrowserAbility_desc",
+        "startWindowIcon": "$media:app_icon",
+        "startWindowBackground": "$color:start_window_background",
+        "removeMissionAfterTerminate": true,
+        "exported": false,
+        "skills": [
+          {
+            "actions": [
+              "ohos.want.action.viewData"
+            ],
+            "uris": []
+          }
+        ],
+        "process": ':browser'
+      },
+      {
+        "name": "StatelessAbility",
+        "srcEntry": "./ets/entryability/StatelessAbility.ets",
+        "description": "$string:StatelessAbility_desc",
+        "label": "$string:StatelessAbility_label",
+        "startWindowIcon": "$media:app_icon",
+        "startWindowBackground": "$color:start_window_background",
+        "launchType": "specified",
+        "removeMissionAfterTerminate": true,
+        "exported": true,
+        "process": ':browser'
+      }
+    ],
+    "extensionAbilities": [
+      {
+        "name": "StatusBarEntryAbility",
+        "icon": "$media:app_icon",
+        "description": "$string:StatusBarEntryAbility_desc",
+        "type": "statusBarView",
+        "exported": false,
+        "srcEntry": "./ets/entryability/StatusBarEntryAbility.ets"
+      },
+      {
+        "name": "BrowserEmbeddedAbility",
+        "srcEntry": "./ets/extensionAbility/BrowserEmbeddedAbility.ets",
+        "type": "embeddedUI",
+        "exported": false,
+      }
+    ]
+  }
+}

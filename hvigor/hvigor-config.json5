@@ -1,0 +1,12 @@
+{
+  "modelVersion": "6.1.0",
+  "dependencies": {},
+  "execution": {
+  },
+  "logging": {
+    // "level": "info"
+  },
+  "debugging": {
+    // "stacktrace": false
+  }
+}

@@ -1,0 +1,37 @@
+/node_modules
+/oh_modules
+/local.properties
+/.idea
+**/build
+/.hvigor
+.cxx
+/.clangd
+/.clang-format
+/.clang-tidy
+**/.test
+/hvigorw
+/oh-package-lock.json5
+/entry/oh-package-lock.json5
+/entry/libs
+/entry/oh_modules
+/electron/oh-package-lock.json5
+/electron/libs
+/electron/oh_modules
+/web_engine/BuildProfile.ets
+/web_engine/oh-package-lock.json5
+/web_engine/oh_modules
+/web_engine/src/main/resources/rawfile
+/web_engine/src/main/resources/resfile
+/dependencies
+
+# ── 1.0.0 定版新增 ─────────────────────────────────────────────
+# DevEco / 工具链本机缓存（含本机绝对路径，不应进仓库）
+/.bitfun
+# 华为官方 Electron 框架文档（PDF / zip，约 3.1 MB）：
+# 第三方资料不随本仓库分发，需要请自行从官方渠道获取
+/docs
+# 本机签名材料绝不入库（仓库里的 build-profile.json5 已把口令清空）
+*.p12
+*.cer
+*.p7b
+*.keystore
