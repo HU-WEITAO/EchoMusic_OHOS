@@ -48,7 +48,7 @@
   <img src="screenshots/02-desktop-mini-card.jpg" width="410" alt="桌面迷你卡片">
   <img src="screenshots/03-screen-lock-lyric.jpg" width="410" alt="锁屏歌词">
   <br>
-  <em>左：实况窗胶囊　右：锁屏大卡片歌词</em>
+  <em>左：实况窗胶囊（含桌面歌词）　右：锁屏大卡片歌词</em>
 </p>
 
 <p align="center">
