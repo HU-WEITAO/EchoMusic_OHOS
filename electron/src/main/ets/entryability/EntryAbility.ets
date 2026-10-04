@@ -23,8 +23,27 @@ import { WebAbility } from 'web_engine';
 const EVENT_STATE = 'echomusic.mc.state';
 /** ArkTS → 原生层：播控命令回传事件（纯文本数据） */
 const EVENT_CMD = 'echomusic.mc.cmd';
-/** 本应用包名（订阅过滤 / 日志用） */
-const BUNDLE_NAME = 'com.example.echomusic';
+/**
+ * 本应用包名（订阅过滤 / 长时任务 WantAgent / 日志用）。
+ *
+ * ★ 2026-10-04 改为运行时填充，**不要再写死字面量**。
+ *
+ * 此前是 `const BUNDLE_NAME = 'com.example.echomusic'`，改包名后没跟着改，
+ * 直接导致「媒体实况窗 + 播控中心一起消失」，且**后台保活也失效**：
+ *   - L~171 `publisherBundleName: BUNDLE_NAME`：状态事件是本应用自己发的，
+ *     订阅方却指向一个不存在的包 ⇒ 收不到事件 ⇒ `setAVMetadata` /
+ *     `setAVPlaybackState` 全部不上报 ⇒ 实况窗没有内容、播控中心空白；
+ *   - `wants: [{ bundleName: BUNDLE_NAME }]`：AUDIO_PLAYBACK 长时任务的
+ *     WantAgent 指向旧包 ⇒ 目标 Ability 不存在 ⇒ 后台保活申请失败。
+ * 桌面歌词依赖同一条系统链路，因此也一并失效（三个现象同一个根因）。
+ *
+ * 现在在 `onCreate` 里从 `context.abilityInfo.bundleName` 取真值。
+ * 该字段自 API 9 起提供，取的是**最终生效的 bundleName**（即
+ * `AppScope/app.json5` 与 `build-profile.json5` 里 product 级那个），
+ * 以后再改包名也不会失配。取不到时兜底为 `''`（订阅的 publisherBundleName
+ * 传空串表示不限定发布方，比写错一个包名更安全）。
+ */
+let BUNDLE_NAME: string = '';
 const TAG = 'MediaBridge';
 
 /**
@@ -79,6 +98,21 @@ export default class EntryAbility extends WebAbility {
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam) {
     super.onCreate(want, launchParam);
+    // 必须在 setupMediaSessionBridge() 之前赋值：订阅的 publisherBundleName
+    // 与长时任务 WantAgent 都要用它。取最终生效的 bundleName，改包名自动跟随。
+    try {
+      // ★ 用 `abilityInfo.bundleName` 而不是 `applicationInfo.bundleName` ——
+      //   后者在 API 23 的 ApplicationInfo 上不存在，编译直接报
+      //   "Property 'bundleName' does not exist on type 'ApplicationInfo'"。
+      //   AbilityInfo.bundleName 自 API 9 起就有，工程内 `ElectronAppAdapter.ets:170`
+      //   的 distributedDeviceManager 也是这么取的，两处保持一致。
+      BUNDLE_NAME = this.context.abilityInfo.bundleName;
+      hilog.info(0x0000, TAG, `bundleName resolved = ${BUNDLE_NAME}`);
+    } catch (e) {
+      BUNDLE_NAME = '';
+      hilog.warn(0x0000, TAG,
+        `resolve bundleName failed, fallback to empty: ${(e as BusinessError).message}`);
+    }
     this.setupMediaSessionBridge();
     this.setupStatusBarIcon();
     this.publishColorMode();
