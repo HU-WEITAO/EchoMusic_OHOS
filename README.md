@@ -29,6 +29,50 @@
 
 ---
 
+## 📸 界面演示
+
+<p align="center">
+  <img src="screenshots/06-player-lyric.jpg" width="820" alt="播放页 - 逐行歌词">
+  <br>
+  <em>播放页：逐行歌词、桌面歌词开关入口</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/01-control-center-media-panel.jpg" width="410" alt="控制中心媒体面板">
+  <img src="screenshots/04-dropdown-cover.jpg" width="410" alt="下拉控制中心">
+  <br>
+  <em>左：控制中心媒体面板　右：下拉控制中心</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/02-desktop-mini-card.jpg" width="410" alt="桌面迷你卡片">
+  <img src="screenshots/03-screen-lock-lyric.jpg" width="410" alt="锁屏歌词">
+  <br>
+  <em>左：桌面迷你播放卡片　右：锁屏歌词</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/05-dropdown-lyric.jpg" width="410" alt="下拉迷你歌词">
+  <img src="screenshots/08-personal-fm.jpg" width="410" alt="私人 FM">
+  <br>
+  <em>左：下拉控制中心迷你歌词　右：私人 FM</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/09-explore.jpg" width="410" alt="探索发现">
+  <img src="screenshots/07-album-credits.jpg" width="410" alt="专辑详情">
+  <br>
+  <em>左：探索发现（歌单 / 排行榜 / 新碟）　右：专辑详情与制作人员</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/10-settings-about.jpg" width="820" alt="设置 - 关于">
+  <br>
+  <em>设置页：关于、版本号与开源仓库入口</em>
+</p>
+
+---
+
 ## ✨ 核心特性
 
 - **播放**：播放队列、播放模式、音量、进度拖动、倍速、淡入淡出切歌
