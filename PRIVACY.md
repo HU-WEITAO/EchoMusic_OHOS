@@ -5,8 +5,7 @@
 | 应用名称 | EchoMusic（HarmonyOS 版） |
 | 软件包名 | `com.hwt.echomusic` |
 | 当前版本 | 1.3.0（versionCode 1300232） |
-| 适用平台 | HarmonyOS（手机 / 平板 / 2in1，arm64-v8a） |
-| 开发者 | 胡伟韬（个人开发者） |
+| 适用平台 | HarmonyOS（平板 / 2in1，arm64-v8a） |
 | 开源仓库 | https://github.com/HU-WEITAO/EchoMusic_OHOS |
 | 生效日期 | 2026 年 11 月 8 日 |
 | 最近更新 | 2026 年 11 月 8 日 |
