@@ -31,6 +31,10 @@
     {
       "name": "OpenNewWindow_label",
       "value": "打开新窗口"
+    },
+    {
+      "name": "mic_permission_reason",
+      "value": "听歌识曲时用于采集周围环境声音"
     }
   ]
 }

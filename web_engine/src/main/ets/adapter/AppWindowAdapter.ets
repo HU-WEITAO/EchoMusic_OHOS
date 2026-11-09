@@ -621,6 +621,17 @@ export class AppWindowAdapter extends BaseAdapter {
     let xComBorder: number = windowProp?.drawableRect.left || 0;
     let xComTop: number = windowProp?.drawableRect.top || 0;
 
+    // 迷你条只有 64vp 高。Electron 的 setMinimumSize / setMaximumSize 可能分两次
+    // 下发（另两个参数为 0），不能只靠 min == max 判定；只要任一有效高度落在
+    // 迷你条量级，就说明调用方要的是精确几何，此时叠加系统装饰区高度会把窗口
+    // 撑到 64 + 标题栏 ≈ 144vp，控制条下面留下一大片白底。
+    const compactMiniWindow =
+      (minHeight > 0 && minHeight <= 96) || (maxHeight > 0 && maxHeight <= 96);
+    if (compactMiniWindow) {
+      xComBorder = 0;
+      xComTop = 0;
+    }
+
     try {
       let windowLimits: window.WindowLimits = {
         minWidth: minWidth === 0 ? minWidth : minWidth + xComBorder + xComBorder,

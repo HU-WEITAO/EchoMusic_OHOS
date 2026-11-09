@@ -7,7 +7,7 @@
   "author": "",
   "name": "ohos_hap",
   "main": "",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "dependencies": {},
   "devDependencies": {
     "@ohos/hypium": "1.0.25",

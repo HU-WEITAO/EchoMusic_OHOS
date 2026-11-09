@@ -43,7 +43,7 @@ const DROP_LOG_GAP_MS: number = 5000;
  * 于是窗口永远停在开场动效的中间某一帧（截图里窗口是倾斜的、每张位置都不同），
  * 这就是用户看到的「在屏幕上乱蹦、根本没法用」。
  *
- * 调用方在 Electron 的 JS 里（`dist-electron/main/app-BOCPSy33.js`），本工程内能
+ * 调用方在 Electron 的主进程 bundle（`dist-electron/main/app-*.js`，构建 hash 随版本变化），本工程内能
  * 产生 `show + moveTop + focus` 的只有这几处：
  *
  * - `cb()`：显示主窗口，`isVisible() || show()` + `moveTop()` + `focus()`

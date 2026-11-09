@@ -31,6 +31,10 @@
     {
       "name": "OpenNewWindow_label",
       "value": "OpenNewWindow"
+    },
+    {
+      "name": "mic_permission_reason",
+      "value": "Used to capture ambient audio for song recognition"
     }
   ]
 }

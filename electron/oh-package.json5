@@ -1,6 +1,9 @@
 {
   "license": "GPL-3.0",
-  "devDependencies": {},
+  "devDependencies": {
+    // AVScreenCapture 内录音频模块的 ArkTS 类型声明（产物 so 在 libs/arm64-v8a）
+    'libecho_screen_capture.so': 'file:./src/main/cpp/types/libecho_screen_capture',
+  },
   "author": "",
   "name": "electron",
   "description": "EchoMusic for HarmonyOS —— entry 模块（上游 https://github.com/hoowhoami/EchoMusic 的鸿蒙移植版）",

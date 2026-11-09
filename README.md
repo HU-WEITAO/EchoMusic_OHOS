@@ -14,8 +14,12 @@
   <img src="https://img.shields.io/badge/Runtime-Chromium%20132-47848F" alt="Runtime">
   <img src="https://img.shields.io/badge/SDK-API%2023-8A2BE2" alt="SDK">
   <img src="https://img.shields.io/badge/Arch-arm64--v8a-blue" alt="Arch">
+  <img src="https://img.shields.io/badge/Upstream-v2.3.2-0F9D58" alt="Upstream">
   <img src="https://img.shields.io/badge/License-GPLv3-orange" alt="License">
 </p>
+
+> **当前载荷基线：上游 v2.3.2（2026-10-26 正式版）**，移植版本号 `1.2.0`。
+> 与上游的功能差异见下文「相对上游 v2.3.2 的功能差异」。
 
 ---
 
@@ -41,21 +45,21 @@
   <img src="screenshots/01-control-center-media-panel.jpg" width="410" alt="控制中心媒体面板">
   <img src="screenshots/04-dropdown-cover.jpg" width="410" alt="下拉控制中心">
   <br>
-  <em>左：PC模式控制中心面板　右：平板模式下拉控制中心</em>
+  <em>左：控制中心媒体面板　右：下拉控制中心</em>
 </p>
 
 <p align="center">
   <img src="screenshots/02-desktop-mini-card.jpg" width="410" alt="桌面迷你卡片">
   <img src="screenshots/03-screen-lock-lyric.jpg" width="410" alt="锁屏歌词">
   <br>
-  <em>左：实况窗胶囊（含桌面歌词）　右：锁屏大卡片歌词</em>
+  <em>左：桌面迷你播放卡片　右：锁屏歌词</em>
 </p>
 
 <p align="center">
   <img src="screenshots/05-dropdown-lyric.jpg" width="410" alt="下拉迷你歌词">
   <img src="screenshots/08-personal-fm.jpg" width="410" alt="私人 FM">
   <br>
-  <em>左：下拉控制中心歌词　右：私人 FM</em>
+  <em>左：下拉控制中心迷你歌词　右：私人 FM</em>
 </p>
 
 <p align="center">
@@ -164,10 +168,64 @@ hvigorw assembleHap --mode module -p product=default -p buildMode=debug --no-dae
 
 > `libelectron.so` 单文件 159 MB，超过 GitHub 单文件 100 MB 上限。完整推送需 **Git LFS**，或按 `.gitignore` 排除后用 Release 附件提供。
 
+## 🧩 相对上游 v2.3.2 的功能差异
+
+本移植版载荷基线为上游 **v2.3.2（2026-10-26 正式版）**。下表按「为什么不可用」分类，
+标注每项在上游的实现依赖，便于判断是否值得继续补齐。
+
+### 一、无 arm64 原生模块（功能降级，不崩溃）
+
+上游 v2.3.2 把部分能力下沉到新的 Rust/C++ napi 模块，本移植版只交叉编译了 4 个
+（播放器 / 音频采集 / 媒体控制 / SQLite），以下 3 个**缺少鸿蒙产物**：
+
+| 功能 | 依赖模块 | 当前表现 | 补齐难度 |
+| --- | --- | --- | --- |
+| 歌词简繁转换（原文/简体/繁体/异体/台湾正体/香港繁体） | `echo-opencc` | 设置项保留，转换调用失败后**回退原文**，歌词正常显示但不变体 | 中：OpenCC + C++ 交叉编译，词典体积大 |
+| DLNA 投放（发现/连接局域网设备） | `echo-upnp` | 设备列表为空，投放入口无设备可选 | 中：Rust + SSDP/SOAP，交叉编译可行 |
+| AirPlay 投放 | `echo-airplay` | 同上 | 高：需 mDNS + RAOP 协议栈 |
+
+`echo-platform-adaptor`、`echo-native-log` 不需要鸿蒙产物：前者只在 `win32`/`darwin`
+分支被调用，后者是其它原生模块内部的日志库，不是独立 addon。
+
+### 二、鸿蒙壳层无对应系统能力（已做等价替代或明确关闭）
+
+| 功能 | 上游实现 | 鸿蒙处置 |
+| --- | --- | --- |
+| 系统托盘 / 托盘菜单 | Electron `Tray` | **状态栏图标 + 菜单**替代（壳层 StatusBarExtension），左键显隐、菜单含退出 |
+| 桌面歌词窗（独立透明 BrowserWindow，横/竖排、置顶、样式自定义） | 第二个 BrowserWindow | 改用**系统桌面歌词组件**（AVSession `setDesktopLyricVisible`）；歌词内容、显隐联动保留，**样式自定义与横竖排不提供** |
+| 迷你播放器（mini 窗） | 第二个 BrowserWindow | **改为同窗内联实现**：主窗口自身收缩成 360×64 迷你条，迷你界面挂在同一渲染进程里；拖动、展开、置顶均可用。设备不允许缩小窗口时自动回退主界面 |
+| 全局快捷键 | `globalShortcut` | **关闭**：每次注册都会拉起系统授权弹窗；设置项强制置为关闭 |
+| 开机自启 | `setLoginItemSettings` | **跳过**：壳层实现会直接跳转系统设置页 |
+| 应用内更新（检查/下载/静默安装） | `electron-updater` | **关闭**；关于页移除更新检查与更新开关，版本号固定显示 |
+| Windows 任务栏歌词 / 缩略图 / 封面预览 | `echo-platform-adaptor`（win32） | 不适用 |
+| Windows 10 透明/毛玻璃、窗口材质 | DWM API | 不适用（无对应合成器接口） |
+| macOS Dock / 菜单栏图标隐藏、后台模式 | AppKit | 不适用 |
+| 自动最大化动画 | 原生 `maximize()` | 改为**直接按屏幕/工作区 setBounds**，避免两段动画 |
+
+### 三、保留但需按设备能力验收
+
+这些能力链路完整、依赖的 4 个原生模块都在，但受设备/系统限制需实测：
+
+- **听歌识曲**：依赖 `echo-audio-capture` 采集系统音频，需系统「音频捕获」授权
+- **音效引擎**：卷积/参数音效、蝰蛇音质、DSP 模块由 `echo-audio-player` 承担，随播放器可用性而定
+- **MV 播放**：走 FFmpeg（`libffmpeg.so`）+ 渲染层 `<video>`，需验证硬解与音画同步
+- **插件系统**：插件市场、插件页面、本地 WebSocket API（本次新增 `ws` 依赖）、文件授权与流式下载
+- **音乐云盘上传**：依赖系统文件选择器（`FilePickerAdapter`）
+- **一起听 / 好友私信 / 刷歌 / 多账号切换**：纯网络 + 渲染层，无平台耦合
+- **窗口形态**：自由窗口尺寸与宽高比已在 `module.json5` 声明式限制
+
+### 四、运行时落差（Electron 34 vs 上游 43）
+
+上游按 Electron 43 API 编写，鸿蒙容器实际是 **Electron 34.x / Chromium 132**。
+34 之后新增的 API 在本环境不可用；本次升级已确认新载荷使用的
+`protocol.registerSchemesAsPrivileged`、`utilityProcess`、`nativeTheme` 等均为 34 已有接口。
+
 ## ⚠️ 已知限制
 
 - 仅在 arm64-v8a 上验证，未做 x86_64
 - 桌面独占能力不可用：系统托盘、全局快捷键、开机自启、桌面歌词窗、自动更新
+- 迷你播放器依赖**自由窗口模式**（PC / 2in1）；平板全屏模式下系统不允许缩窗，
+  会打印 `[MiniPlayer] ohos in-place window cannot shrink` 并自动回退主界面
 - 听歌识曲、音乐云盘、插件系统、音效引擎等在鸿蒙侧的完整可用性**尚未逐项验收**
 - `supportWindowMode` 含 `floating`：若实况窗不再出现，用 `module.json5.bak-nosplit` 回退
 

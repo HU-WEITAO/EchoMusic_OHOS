@@ -5,9 +5,11 @@
     "srcEntry": "./ets/Application/AbilityStage.ets",
     "description": "$string:module_desc",
     "mainElement": "EntryAbility",
-    // 设备类型必须包含 phone。仅声明 ["2in1","tablet"] 时系统会把本应用判定为
-    // 「PC 端应用」，窗口被归入 PC 应用窗口容器，回桌面只最小化窗口、不产生
-    // ability 退后台，媒体实况窗（状态栏胶囊）因此始终不显示。
+    // 设备类型必须包含 phone（已二次真机验证，勿删）：
+    // 只声明 ["2in1","tablet"] 时系统会把本应用判为「PC 端应用」，窗口归入 PC
+    // 应用窗口容器，回桌面只最小化窗口、不产生 ability 退后台，媒体实况窗
+    // （状态栏胶囊）因此始终不显示。应用侧没有可绕开该判定的公开开关。
+    // 2026-11-08 曾去掉 phone 重新打包安装：安装正常，但实况窗确实消失，故恢复。
     "deviceTypes": [
       "phone",
       "tablet",
@@ -27,6 +29,19 @@
         // 申请 AUDIO_PLAYBACK 长时任务（后台播放保活 + 媒体实况窗）所必需，
         // 缺失时 startBackgroundRunning 直接报 201 Permission denied
         "name": "ohos.permission.KEEP_BACKGROUND_RUNNING"
+      },
+      {
+        // 听歌识曲的「麦克风」音源：AudioCapturer 以 SOURCE_TYPE_MIC 采集前
+        // 必须拿到 user_grant 授权（壳层 PlaybackCaptureService 里运行时申请）。
+        // 「系统音频」走 AVScreenCapture 的录屏授权链路，micCapInfo 采样率/声道数
+        // 全 0、完全不采麦克风，因此不需要本权限；系统自行弹出「允许使用你的屏幕」
+        // 确认框。AVScreenCapture 本身不需要在 requestPermissions 里声明权限。
+        "name": "ohos.permission.MICROPHONE",
+        "reason": "$string:mic_permission_reason",
+        "usedScene": {
+          "abilities": ["EntryAbility"],
+          "when": "inuse"
+        }
       }
     ],
     "abilities": [
@@ -57,17 +72,20 @@
         //
         // 为什么要限制比例：本应用是 WebView 壳，页面按窗口宽度做响应式排布，
         // 窗口被拖成极窄高或极扁宽的条状时整体布局会错位（侧边栏被挤扁、内容溢出）。
-        //   · minWindowRatio = 宽 ÷ 高的**下限** = 1.0 → 不允许出现"高于宽"的竖条窗口；
-        //   · maxWindowRatio = 宽 ÷ 高的**上限** = 2.5 → 允许横向拉宽，但挡住最扁的极端形状。
+        //   · minWindowRatio = 宽 ÷ 高的**下限** → 不允许出现"高于宽"的竖条窗口；
+        //   · maxWindowRatio = 宽 ÷ 高的**上限** → 允许横向拉宽，但挡住最扁的极端形状。
         // 未显式给出的 maxWindowWidth / maxWindowHeight 保持系统默认（不设上限）。
         //
-        // ★ 调参入口就在这里，改完重编即可，不需要动代码。
-        //   若发现平板"左右分屏"被限制住 —— 横屏对半分出来的窗口比例约 0.75，低于
-        //   下限 1.0 —— 把 minWindowRatio 下调到 0.7 ~ 0.75 即可。
-        "minWindowWidth": 640,
-        "minWindowHeight": 400,
+        // ★ 迷你播放器（360vp × 64vp，宽高比 5.625）必须能收缩到这个比例。
+        //   曾经的 maxWindowRatio = 2.5 会把 360vp 宽的窗口高度硬钳到 360÷2.5 = 144vp，
+        //   迷你条下面空出 80vp 白底 —— 这是「迷你窗下面一大片白色」的真正根因，
+        //   渲染层怎么补都补不掉。这里放宽到 8.0 才能容纳 5.625。
+        //   运行期主窗口仍由 setMinimumSize(1100, 650) 约束，放宽静态下限不会让
+        //   正常主窗口被拖成条状；迷你窗则由 setMinimumSize/setMaximumSize 锁定 360×64。
+        "minWindowWidth": 320,
+        "minWindowHeight": 64,
         "minWindowRatio": 1.0,
-        "maxWindowRatio": 2.5,
+        "maxWindowRatio": 8.0,
         // 后台音频播放模式：系统据此为活跃 AVSession 激活媒体实况窗（锁屏/状态栏胶囊）
         "backgroundModes": ["audioPlayback"],
         "skills": [

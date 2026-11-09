@@ -2,26 +2,61 @@
 
 这个文件夹**就是 DevEco Studio 的工程根目录**，直接 `File → Open` 打开本文件夹即可编译出 HAP。
 
+> ## 📌 当前状态速查（最后更新：2026-11-08，以本节为准）
+>
+> **本文第一 ~ 十九节写于 2026-09-19 ~ 09-20，是当时的排查/编译档案；第七节的「SDK 降级到 API 23」已经作废。**
+> 2026-11-07 ~ 11-08 本轮（升级上游 v2.3.2 载荷、API 26、播控五元组、系统投播、AVScreenCapture 内录、UI/版本调整）之后的实际状态如下，
+> **跨机编译只看第一、二、三、六节 + 文末「二十、本轮改动与最新编译指南」**：
+>
+> | 项 | 当前值 |
+> | --- | --- |
+> | 应用版本 | `versionName = "1.3.0"`（**纯语义化，不能带括号构建号**），`versionCode = 1300232`（`AppScope/app.json5`）<br>界面与 CHANGELOG 里的完整写法 `1.3.0(1300232)` 属于展示层，不要回填进 `versionName`，否则应用市场报格式错 |
+> | SDK | **已恢复 API 26**：`compatibleSdkVersion` = `targetSdkVersion` = `"26.0.0"`（`build-profile.json5`）<br>`oh-package.json5` / `hvigor-config.json5` 的 `modelVersion` 仍是 `"6.1.0"`，实测 API 26 下构建通过，无需改 |
+> | IDE | Windows / macOS 版 **DevEco Studio 26.0.0 Release**（自带 API 26 SDK）；鸿蒙电脑版 6.1.x Preview 只有 API 23，**打不了本工程的 API 26 包** |
+> | 签名 | `build-profile.json5` 现**已带本机 `signingConfigs`**（`C:/Users/47990/.ohos/config/...`），换机必须替换成自己的签名，见第一节 |
+> | 设备类型 | `deviceTypes = ["phone","tablet","2in1"]`，**`phone` 千万别删**（二次真机验证：删了媒体实况窗消失） |
+> | 新增原生库 | `electron/libs/arm64-v8a/libecho_screen_capture.so`（26 KB，AVScreenCapture 内录），随 `collectAllLibs` 打包，**HAP 构建不跑 CMake** |
+> | Electron 载荷 | 上游 v2.3.2 正式版 + 鸿蒙适配改动，前端源码在 `work/EchoMusic/`，产物在 `web_engine/src/main/resources/resfile/resources/` |
+> | 最新构建 | 2026-11-08 `assembleHap` **BUILD SUCCESSFUL**，`electron-default-signed.hap` ≈ 234 MB；`hdc install -r` 成功，设备侧 `bm dump` 为 `versionCode=1300232 / versionName=1.3.0` |
+> | 应用市场 | `versionName` 只写 `1.3.0`；系统/市场展示时会自己拼成 `1.3.0 (1300232)`，详见 20.1 |
+> | 新增/改动重点 | 播控中心五元组、AVCastPicker 系统投播、听歌识曲系统音频改走 AVScreenCapture、关于页/更新日志/QQ 二维码修复、版本号对齐 |
+>
+> 第一 ~ 十九节中的「API 23 / 6.1.0(23) / 1.2.0 / 3000001 / 降级说明 / 8 个原生库」等表述均为**历史记录**，不再代表当前工程。
+
 ---
 
 ## 一、拷到鸿蒙电脑上后，只做两件事
 
 ### 1. 配上自己的签名（必做，否则编译报错）
 
-`build-profile.json5` 里原先的 `signingConfigs` 指向的是**原机器的绝对路径证书**：
+**2026-11-08 现状：`build-profile.json5` 里又带上了本机签名**（为了让 `assembleHap` 直接出签名 HAP）：
 
 ```
-C:\Users\47990\.ohos\config\default_ohos_hap_...=.p12 / .cer / .p7b
+"signingConfig": "default"
+"signingConfigs": [{
+  "name": "default", "type": "HarmonyOS",
+  "material": {
+    "certpath": "C:/Users/47990/.ohos/config/default_EchoMusic_OHOS_...=.cer",
+    "profile":   "C:/Users/47990/.ohos/config/default_EchoMusic_OHOS_...=.p7b",
+    "storeFile": "C:/Users/47990/.ohos/config/default_EchoMusic_OHOS_...=.p12",
+    ...
+  }
+}]
 ```
 
-这些文件是 DevEco 在原机器上**用华为账号自动签名**时生成的，换台电脑必然不存在。
-（**2026-09-19 更新**：该段连同 `products[0].signingConfig` 引用已一并删除，工程现已处于「未配置签名」状态，Sync 不会再因证书路径报错；原值完整保留在 `build-profile.json5.bak-sdk26.0.0`。）
+这 3 个文件是 DevEco 在本机**用华为账号自动签名**时生成的，换台电脑必然不存在；
+`keyPassword` / `storePassword` 也是本机自动签名材料，**不要提交到公开仓库**。
 
 在目标机的 DevEco 里改成自己的签名：
 
 > `File → Project Structure → Project → Signing Configs` → 勾选 **Automatically generate signature**（需登录华为账号）
 
-或者手动指定你自己申请好的 `.p12 / .cer / .p7b`。
+或者手动指定你自己申请好的 `.p12 / .cer / .p7b`。若只想先验证能否编译，也可以把
+`signingConfigs` 整段和 `products[0].signingConfig` 一并删掉（工程回到「未配置签名」，
+Sync 不报错，但命令行只能出 `electron-default-unsigned.hap`）。
+
+> 历史：2026-09-19 曾删掉该段并留档 `build-profile.json5.bak-sdk26.0.0`；
+> 2026-11 本轮为直接构建/安装又恢复了签名配置。**以当前 `build-profile.json5` 为准。**
 
 ### 2. 编译
 
@@ -29,15 +64,25 @@ DevEco 里直接：
 
 > `Build → Build Hap(s)/APP(s) → Build Hap(s)`
 
-命令行方式：
+命令行方式（工程根目录下）：
 
 ```bash
-# 工程根目录下
 ohpm install
 hvigorw assembleHap --mode module -p product=default -p buildMode=debug --no-daemon
 ```
 
 产物路径：`electron/build/default/outputs/default/electron-default-signed.hap`
+
+**2026-11 本轮实测的 Windows 环境**（`hvigorw` / `hdc` 默认不在 PATH，且打包阶段缺 `JAVA_HOME` 会报 `spawn java ENOENT`）：
+
+```powershell
+$env:DEVECO_SDK_HOME = "D:\Huawei\DevEco Studio\sdk"
+$env:JAVA_HOME      = "D:\Huawei\DevEco Studio\jbr"
+& "D:\Huawei\DevEco Studio\tools\hvigor\bin\hvigorw.bat" assembleHap --mode module -p product=default -p buildMode=debug --no-daemon
+```
+
+- 判断成功看输出里的 **`BUILD SUCCESSFUL`**，不要只看退出码：PowerShell 会把 stderr 的 ArkTS deprecation WARN 当成失败（exit 1）但包其实已生成，以 HAP 时间戳为准。
+- `hdc` 在 `D:\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe`；Git Bash 里传 `C:\...` 绝对路径会被当成相对路径（且退出码仍为 0），**安装请用 PowerShell 或 `MSYS_NO_PATHCONV=1` + 相对路径**，并认准 `install bundle successfully` 文案。
 
 ---
 
@@ -45,10 +90,12 @@ hvigorw assembleHap --mode module -p product=default -p buildMode=debug --no-dae
 
 | 项目 | 要求 |
 | --- | --- |
-| DevEco Studio | **原始要求**：带 HarmonyOS SDK API 26（HarmonyOS 26.0.0），在 `DS-261.23567.138.36.2600821` 上验证通过。<br>**当前副本**：已降至 API 23，详见文末「七、SDK 版本降级说明」 |
-| SDK 版本 | **当前值**：`compatibleSdkVersion` = `targetSdkVersion` = `6.1.0(23)`，`modelVersion` = `6.1.0`（原均为 `26.0.0`） |
-| 目标设备 | arm64-v8a（`electron/libs/arm64-v8a/`） |
+| DevEco Studio | **当前（2026-11-08）**：Windows / macOS 版 **26.0.0 Release**（`DS-261.23567.138.36.2600821`，自带 API 26 SDK）。<br>鸿蒙电脑版 6.1.x Preview 内置 SDK 只到 API 23，**编不了当前 API 26 工程**；那段降级历史见第七节（已作废，仅存档） |
+| SDK 版本 | **当前值**：`compatibleSdkVersion` = `targetSdkVersion` = **`"26.0.0"`**；`compileSdkVersion` 不写（缺省 = IDE 自带 SDK）。<br>`oh-package.json5` / `hvigor/hvigor-config.json5` 的 `modelVersion` 保持 `"6.1.0"`，实测 API 26 下 `assembleHap` 通过，**不要为了「对齐」去改它** |
+| Native 工具链 | 只重编 `libecho_screen_capture.so` 时才需要 OHOS NDK（`<SDK>/default/openharmony/native`）；普通 HAP 构建用预编译 `.so`，不跑 CMake |
+| 目标设备 | arm64-v8a（`electron/libs/arm64-v8a/`）；`deviceTypes = ["phone","tablet","2in1"]` |
 | 网络 | 首次 Sync 会执行 `ohpm install`；已内置 `oh_modules`，离线也能编 |
+| 前端构建（可选） | 只有在改渲染层/主进程时才需要 Node + pnpm + Vite，源码在 `work/EchoMusic/`，见第二十节 |
 
 ---
 
@@ -56,19 +103,24 @@ hvigorw assembleHap --mode module -p product=default -p buildMode=debug --no-dae
 
 这两块是**编译必需但目标机上无法重新生成**的资产，随工程一起打包好了：
 
-### 1. 原生库 —— `electron/libs/arm64-v8a/`（约 187 MB）
+### 1. 原生库 —— `electron/libs/arm64-v8a/`（约 187 MB，**现为 9 个**）
 
 ```
-echo-audio-capture.node      1.4 MB   音频采集
+echo-audio-capture.node      1.4 MB   音频采集（听歌识曲 · 麦克风）
 echo-audio-player.node       7.7 MB   音频播放
 echo-media-controls.node     1.3 MB   媒体控制 / AVSession
 echo-sqlite-store.node       3.0 MB   本地存储
 libelectron.so             166.8 MB   Electron 运行时
 libffmpeg.so                 2.2 MB   编解码
 libadapter.so / libc++_shared.so
+libecho_screen_capture.so     26 KB   ★ 2026-11 新增：AVScreenCapture 内录音频（系统音频）
 ```
 
 这些是在**本机用鸿蒙交叉编译工具链**从 EchoMusic 的 Rust/C++ 源码编出来的，目标机上没有对应工具链，删了补不回来。
+最后那个 `.so` 比较特殊：它是本轮用 OHOS NDK `clang++` 直接交叉编译的（源码
+`electron/src/main/cpp/echo_screen_capture.cpp`，重编方法见 `CMakeLists.txt` 头部注释 /
+第二十节），靠 `build-profile.json5` 的 `nativeLib.collectAllLibs: true` 打进 HAP，
+**hvigor 里没有也不需要 `externalNativeOptions`**。少了它，听歌识曲的「系统音频」音源直接不可用。
 
 ### 2. Electron 载荷 —— `web_engine/src/main/resources/resfile/resources/`
 
@@ -76,9 +128,22 @@ libadapter.so / libc++_shared.so
 app/      28 MB   Chromium/Electron 主进程 + 渲染层 dist（已打好 addon 绝对路径补丁）
 native/  3.0 MB
 server/   15 MB   Node 服务端
+CHANGELOG.md      ★ 关于页「更新日志」读取的就是这一份
+app/CHANGELOG.md  ★ 同一内容的第二份（主进程多候选路径兜底）
 ```
 
 同理：前端 dist 和主进程 bundle 都已构建并打好补丁，**不需要**在目标机上重新跑前端或 Rust 构建。
+
+本轮载荷里另外两处**不能丢**的改动（都在源码级，重新构建前端时会覆盖，见第二十节）：
+
+- `app/dist-electron/main/settings-*.js`：`resolveChangelogPath()`，OHOS 下 `app.isPackaged` 不可靠，
+  必须按 `__dirname` 多候选探测 `CHANGELOG.md`（否则「关于 → 更新日志」显示「暂无更新日志」）。
+- `server/util/set_cookie.js` + `server/module/login_qq_qr_{create,check}.js` + `server/util/request.js`：
+  OHOS 单 `Set-Cookie` 返回**字符串**而非数组，不兼容会报 `qrSetCookies.forEach is not a function`，
+  QQ 扫码登录二维码加载不出来。
+
+> 注意：**上游源码 `work/EchoMusic/CHANGELOG.md` 不要写 OHOS 发布记录**，那是桌面端的完整上游 changelog；
+> OHOS 的更新日志只改上面 `resources/` 与 `resources/app/` 两份，改完必须重新 `assembleHap`。
 
 ---
 
@@ -115,6 +180,24 @@ hvigorw assembleHap ...          → BUILD SUCCESSFUL in 47 s 698 ms
 41 个任务全部实际执行（`0 up-to-date`），说明不是靠本地缓存蒙混过关——这份文件夹本身是自洽、可独立编译的，
 不依赖 `echomusic-pkg/` 或 `ohos-port/` 下的任何其他内容。
 
+**2026-11-08 本轮最后一次（API 26 / versionCode 1300232）**：
+
+```
+vue-tsc --noEmit                 → 0 错
+npx vite build                   → 三环境产物成功，dist 332 文件同步进载荷
+hvigorw assembleHap ...          → BUILD SUCCESSFUL（约 55 s，exit 0）
+electron-default-signed.hap      → 234,127,639 B（2026-11-08 18:21）
+hdc install -r                   → install bundle successfully
+bm dump -n com.hwt.echomusic     → versionCode=1300232
+                                    versionName=1.3.0
+                                    minCompatibleVersionCode=1300232
+                                    deviceTypes=["phone","tablet","2in1"]
+```
+
+HAP 解包核验：`libs/arm64-v8a/libecho_screen_capture.so`、`server/util/set_cookie.js`、
+两份 5297 B 的 `CHANGELOG.md`、含 OHOS 候选路径的主进程 bundle 均在包内。
+完整核验脚本与清单见文末第二十节。
+
 ---
 
 ## 六、易踩的坑
@@ -129,9 +212,31 @@ hvigorw assembleHap ...          → BUILD SUCCESSFUL in 47 s 698 ms
   - 回退用 `electron/src/main/module.json5.bak-nosplit`。
 - 注：本节原先引用的「同级的 V35 发布说明」在本目录并不存在（悬空引用），上述取舍依据以 `electron/src/main/module.json5` 内的注释为准。
 
+**2026-11 本轮新增（都是真机/构建实际踩过的）**：
+
+- **`deviceTypes` 去掉 `phone` → 媒体实况窗消失**：两次真机验证。系统会把只声明 tablet/2in1 的应用判为「PC 端应用」，回桌面只最小化窗口、不产生 ability 退后台，胶囊不显示；应用侧没有公开开关可绕开。已恢复 `["phone","tablet","2in1"]`，**别再试**。
+- **迷你窗白底 / ✕ 放大不要改 CSS**：根因是 `module.json5` 的 `maxWindowRatio: 2.5` 把 360vp 宽的窗口钳到 144vp 高（现为 **8.0**，`minWindowWidth=320 / minWindowHeight=64`），以及 `AppWindowAdapter.setWindowLimits()` 给 64vp 叠加系统装饰高度（≤96vp 时跳过补偿）。遇到「内容下方多一截」先量窗口几何。
+- **AVSession 命令文件必须写应用级 `filesDir`**：`UIAbilityContext.filesDir` 是模块级；Electron 主进程读的是 `getApplicationContext().filesDir`（应用级）。写错层级 → 播控中心按钮点了完全没反应。
+- **不要在 `session.on(...)` 回调里同步 `setAVPlaybackState()`**：系统会把这次操作当成「应用自己已改状态」而丢弃；图标交给渲染层 `centerstate` 回传的真实值驱动。
+- **`app.isPackaged` 在 OHOS 兼容壳里不可靠**：`isDev = !app.isPackaged` 恒为 true，凡是按它选资源路径的代码（changelog、server）都要改成按 `__dirname` 多候选 + `existsSync` 探测。
+- **`Set-Cookie` 可能是字符串**：OHOS HTTP 适配层单个 cookie 返回 string，多个才返回 array；按数组 `.forEach` 会炸。统一走 `server/util/set_cookie.js`。
+- **降级安装会清空数据**：`versionCode` 变小（`3000001 → 1300232`）时覆盖安装要先卸旧包，命令被中断就停在「已卸载」状态，且卸载会清掉登录态/歌单。**以后保持 versionCode 单调递增**。
+- **应用市场报「版本（版本号）」格式错**：不要把构建号写进 `versionName`。系统/市场会把 `versionName` 和 `versionCode` 拼成 `1.3.0 (1300232)` 展示；若 `versionName` 已经是 `1.3.0(1300232)`，就变成截图里的 `1.3.0(1300232) (1300232)` 并导致上传校验失败。正确写法：`versionName: "1.3.0"` + `versionCode: 1300232`，完整版本号只放在关于页 `versionLabel` 与 CHANGELOG 标题里。
+- **`hdc` / `hvigorw` / `JAVA_HOME` 路径坑**：见第一节末，打包阶段缺 `JAVA_HOME` 报 `spawn java ENOENT`（00308018）。
+- **读 HAP 内文件**：PowerShell `Add-Type -AssemblyName System.IO.Compression.FileSystem` 可能被安全策略拦截，用 Python `zipfile` 解包最省事。
+
 ---
 
 ## 七、SDK 版本降级说明（2026-09-19）
+
+> ## ⚠️ 本节已作废 —— 2026-11-08 起工程**已恢复 API 26**
+>
+> 当前 `build-profile.json5` 是 `compatibleSdkVersion = targetSdkVersion = "26.0.0"`，
+> 并用 Windows 版 DevEco Studio 26.0.0 Release 构建 + 安装成功。
+> 下面关于「降到 6.1.0(23)」「四字段一起改」「`.bak-sdk26.0.0` 回退」的内容**只作历史存档**，
+> 不要照着把当前工程再降回 API 23（播控中心五元组 `setMediaCenterControlType`、
+> `setSupportedLoopModes`、AVCastPicker 等都是 API 26 能力，降回去会直接编译失败）。
+> `EntryAbility.ets.bak-api26`、`*.bak-sdk26.0.0` 等备份文件仍留在工程里，仅用于考古。
 
 ### 为什么降
 
@@ -1574,3 +1679,233 @@ true，上面那条"关三键"的分支在平板上是死代码**。而 2in1 / P
 
 **回退**：本轮全部是删除可再生成的产物与临时脚本，无需回退。唯一不可再生的
 `EchoMusic-OHOS-DevEco-Project.zip` 已按上面的方式把有价值部分留档。
+
+---
+
+## 二十、2026-11-07 ~ 11-08 本轮改动与最新编译指南
+
+> 这一节是**当前工程的唯一有效操作说明**。前面十九节是 2026-09 的排查档案。
+> 本轮把载荷从「2.3.2-beta 旧产物」换成**上游 v2.3.2 正式版**，并补齐了 API 26 的
+> 播控中心五元组、系统投播、听歌识曲系统内录，最后把版本/关于页/更新日志/QQ 登录一起收口。
+
+### 20.1 当前配置基线（改配置前先核对）
+
+| 文件 | 关键内容 |
+| --- | --- |
+| `AppScope/app.json5` | `versionCode: 1300232`、`versionName: "1.3.0"`（**纯语义化**；关于页 `versionLabel` 与 CHANGELOG 标题才写完整 `1.3.0(1300232)`） |
+| `build-profile.json5` | `targetSdkVersion` / `compatibleSdkVersion` = `"26.0.0"`、`nativeLib.collectAllLibs: true`、本机 `signingConfigs` + `products[0].signingConfig: "default"` |
+| `oh-package.json5`、`hvigor/hvigor-config.json5` | `modelVersion: "6.1.0"`（保持不变，API 26 下已验证可编） |
+| `electron/src/main/module.json5` | `deviceTypes: ["phone","tablet","2in1"]`（phone 不可删）、`supportWindowMode: ["fullscreen","split","floating"]`、`maxWindowRatio: 8.0` / `minWindowWidth: 320` / `minWindowHeight: 64`、`backgroundModes: ["audioPlayback"]`、`KEEP_BACKGROUND_RUNNING` + `MICROPHONE`（仅麦克风音源用） |
+| `electron/oh-package.json5` | `devDependencies: { 'libecho_screen_capture.so': 'file:./src/main/cpp/types/libecho_screen_capture' }`（ArkTS 类型声明） |
+| `web_engine/src/main/resources/resfile/resources/` | Electron 载荷：`app/`（dist + dist-electron）、`server/`、`native/`、`CHANGELOG.md`；`app/CHANGELOG.md` 为同内容副本 |
+
+`ohos/EchoMusic_OHOS/` 是工作区里的**旧快照副本**，不参与本轮构建；只有 `AppScope/app.json5`
+与 4 个 server 文件（`set_cookie.js` 等）跟着同步过，**不要拿它当编译源**。
+
+#### 20.1.1 上传应用市场：`versionName` 不要带构建号
+
+应用市场 / 系统的包信息页会把两个字段拼起来展示成「**版本（版本号）**」= `versionName (versionCode)`。
+本轮一度把界面上要显示的 `1.3.0(1300232)` 直接写进了 `versionName`，结果展示成：
+
+```
+1.3.0(1300232) (1300232)
+```
+
+并且**上传应用市场时版本名格式校验报错**。2026-11-08 已修正为：
+
+```json5
+"versionCode": 1300232,
+"versionName": "1.3.0",
+```
+
+分工要记牢：
+
+| 位置 | 写法 | 用途 |
+| --- | --- | --- |
+| `AppScope/app.json5` → `versionName` | `1.3.0` | 给系统 / 应用市场看，必须纯语义化 |
+| `AppScope/app.json5` → `versionCode` | `1300232` | 包管理器比较升级的整数，单调递增 |
+| `AboutSettingsSection.vue` → `versionLabel` | `1.3.0(1300232)` | 关于页展示文案（硬编码，不读 app.json5） |
+| `CHANGELOG.md` 标题 | `## 1.3.0(1300232)` | 更新日志里的发布标识 |
+
+改完 `app.json5` 后必须重新 `assembleHap` —— **已经上传过的那个包里仍是旧 versionName，改源码不会改变已生成的 HAP**。
+`versionCode` 没变（还是 1300232），新包可直接 `hdc install -r` 覆盖，不触发降级卸载。
+
+### 20.2 本轮改动清单（按层）
+
+**① 壳层 ArkTS（改这些只需重新 `assembleHap`）**
+
+| 文件 | 作用 |
+| --- | --- |
+| `electron/src/main/ets/entryability/EntryAbility.ets` | AVSession 五元组（`setMediaCenterControlType(['playPrevious','playNext','setLoopMode','toggleFavorite'])` + `setSupportedLoopModes`）；`mc-command.json` 命令桥、`centerstate` 反向上报；AVCastPicker（`setExtras({requireAbilityList:['url-cast']})` + `AVMetadata.filter = TYPE_CAST_PLUS_STREAM \| TYPE_DLNA` + `outputDeviceChange` → `cast-state.json`）＋ `AVCastController.prepare/start`；`type==='capture'` 前置处理 |
+| `electron/src/main/ets/entryability/ScreenCaptureService.ets` | 新增。100 ms 轮询 native `status()`，写 `ac-state.json` / `ac-pcm.raw`，60 s 授权看门狗 |
+| `electron/src/main/ets/entryability/PlaybackCaptureService.ets` | 改为音源门面：`system` → AVScreenCapture，`mic` → AudioCapturer；切音源给另一条链路补发 cancel |
+
+播控中心真机卡片为「循环 · 上一首 · 播放/暂停 · 下一首 · 收藏」（播放/暂停由系统按 audio 规则补）。
+三个隐蔽坑：命令文件要写**应用级** `getApplicationContext().filesDir`；状态要由渲染层 `centerstate`
+反向上报 `loopMode/isFavorite`；**不能**在 `session.on(...)` 回调里同步 `setAVPlaybackState()`；
+主进程命令去重用「文件内容比对」而不是跨重启会失配的 `seq`。
+
+**② Native（AVScreenCapture 内录，替代会黑白屏的 `InnerCapturerDialogExtension`）**
+
+```
+electron/src/main/cpp/echo_screen_capture.cpp                C API 实现（446 行）
+electron/src/main/cpp/CMakeLists.txt                        仅用于重编 so，hvigor 不调用
+electron/src/main/cpp/types/libecho_screen_capture/         ArkTS 声明 index.d.ts + oh-package.json5
+electron/libs/arm64-v8a/libecho_screen_capture.so           预编译产物（26 KB）
+electron/oh_modules/libecho_screen_capture.so/               同上类型声明的安装副本
+```
+
+关键配置（少一项就变成「同时采画面/麦克风」或授权弹框不对）：
+`OH_AVScreenCaptureConfig` 整体清零；`innerCapInfo.audioSource = OH_ALL_PLAYBACK`、
+48000 Hz / 2 ch；`micCapInfo.audioSampleRate = 0`、`audioChannels = 0`（完全不采麦克风）；
+`videoCapInfo.videoFrameWidth/Height = 0`（完全不采画面）；`dataType = OH_ORIGINAL_STREAM`。
+用户看到的是系统「**允许使用你的屏幕**」授权框，不再出现旧的黑白屏 `InnerCapturerDialogExtension`。
+`SetSelectionCallback`（API 20+）用 `dlsym` 动态解析，避免低版本硬符号依赖。
+
+**③ Electron 载荷 · 前端/主进程（源码 `work/EchoMusic/`，构建后同步进载荷）**
+
+- 投放：删除自研 DLNA / AirPlay / SSDP / mDNS 死代码约 8.4k 行，新增 `castBridge.ts`、
+  `ipc/cast.ts`、`stores/cast.ts`、`CastPanel.vue`；`MediaServer` 保留，负责生成带令牌的
+  `http://<lan-ip>:<port>/res/<token>` 给 `AVCastController`；投播成功后自动暂停本机播放。
+- 听歌识曲主进程：`ohosAudioCapture.ts` 保留 `ac-state.json` / `ac-pcm.raw` 与 8 kHz mono
+  S16LE 重采样，`START_TIMEOUT_MS` 50 s → **65 s**（必须大于壳层 60 s 看门狗）。
+- 五元组回传：`now-playing` → `media-control:update-center-state` → `centerstate`；命令处理
+  `playmode:<mode>` / `favorite`。
+- UI：屏蔽歌词设置里的「桌面歌词」整块子分区（播放栏开关与字体设置未动）、
+  关于页「上游项目源码」+ 新增「项目源码」（OHOS releases）、`versionLabel = 1.3.0(1300232)`、
+  `.changelog-content :deep(strong)` 让加粗标题真正黑、`Recognize.vue` 文案改「允许使用你的屏幕」。
+- 设置 IPC：`resolveChangelogPath()`，OHOS 分支按 `__dirname` 多候选探测 `CHANGELOG.md`，
+  修复「暂无更新日志」。
+
+**④ Electron 载荷 · server（直接改载荷目录，重新同步 server 会覆盖，务必留意）**
+
+```
+server/util/set_cookie.js                 新增：normalizeSetCookie / collectCookies
+server/module/login_qq_qr_create.js      两处 forEach → collectCookies
+server/module/login_qq_qr_check.js       → normalizeSetCookie
+server/util/request.js                   → normalizeSetCookie
+```
+
+**⑤ 更新日志**：只改载荷内**两份** `CHANGELOG.md`（`resources/` 与 `resources/app/`，
+当前各 5297 B）。`work/EchoMusic/CHANGELOG.md` 是上游桌面端完整日志，**不要动**。
+
+### 20.3 按改动范围选构建链（别每次都全量重来）
+
+| 你改了什么 | 需要跑什么 |
+| --- | --- |
+| 仅 `*.json5` / ArkTS 壳层 / 载荷里的 `CHANGELOG.md` / server `*.js` | 只跑 `hvigorw assembleHap`，重新打包即可 |
+| 渲染层 `.vue` / 主进程 `.ts`（`work/EchoMusic/src/`） | `npx vue-tsc --noEmit` → `npx vite build` → 同步 `dist` / `dist-electron` 到载荷 → `assembleHap` |
+| `echo_screen_capture.cpp` | 用 NDK `clang++` 重编 `.so` 到 `electron/libs/arm64-v8a/` → `assembleHap` |
+| 签名 / SDK 版本 | 只改 `build-profile.json5`，然后 Sync + `assembleHap` |
+
+前端同步注意（`cp -rf` 增量覆盖即可）：
+
+```
+work/EchoMusic/dist/           → .../resources/app/dist/
+work/EchoMusic/dist-electron/  → .../resources/app/dist-electron/
+```
+
+Vite 每次构建的 chunk 名带 hash，**必须剪掉载荷里的过期 hash 文件**，否则包越来越大、
+`index.js` 仍指向新 chunk 但旧文件白占体积；用脚本按文件名差集删，别用 `rm -rf` 整目录
+（会触发批量删除确认）。同步后确认 `index.js` 引用的主 bundle 确实存在。
+
+### 20.4 重编 `libecho_screen_capture.so`（只有改 C++ 时才需要）
+
+```bash
+CLANG="D:/Huawei/DevEco Studio/sdk/default/openharmony/native/llvm/bin/clang++.exe"
+SYSROOT="D:/Huawei/DevEco Studio/sdk/default/openharmony/native/sysroot"
+LIB="$SYSROOT/usr/lib/aarch64-linux-ohos"
+"$CLANG" --target=aarch64-linux-ohos --sysroot="$SYSROOT" -std=c++17 \
+    -fPIC -shared -O2 -I"$SYSROOT/usr/include" \
+    -o electron/libs/arm64-v8a/libecho_screen_capture.so \
+    electron/src/main/cpp/echo_screen_capture.cpp \
+    -L"$LIB" -lnative_avscreen_capture -lnative_media_core \
+    -l:libace_napi.z.so -l:libhilog_ndk.z.so -ldl
+```
+
+> **链接坑**：`libace_napi` / `libhilog_ndk` 的真实文件名带 `.z`，必须写
+> `-l:libace_napi.z.so` / `-l:libhilog_ndk.z.so`，写 `-lace_napi` 会报 unable to find library。
+> napi 模块名是 `echo_screen_capture`（去 `lib` 前缀与 `.so` 后缀），对应 ArkTS
+> `import screenCapture from 'libecho_screen_capture.so'`，与 `libadapter.so` ↔ `adapter` 同构。
+> `CMakeLists.txt` 只是这份命令的等价配置备份；**HAP 构建不跑 CMake**。
+
+### 20.5 完整构建 + 产物核验
+
+```powershell
+# 1) 依赖（首次或 oh_modules 异常时）
+ohpm install
+
+# 2) 组装 HAP（PowerShell，工程根目录）
+$env:DEVECO_SDK_HOME = "D:\Huawei\DevEco Studio\sdk"
+$env:JAVA_HOME      = "D:\Huawei\DevEco Studio\jbr"
+& "D:\Huawei\DevEco Studio\tools\hvigor\bin\hvigorw.bat" assembleHap --mode module -p product=default -p buildMode=debug --no-daemon
+# 认 "BUILD SUCCESSFUL"，不要只看 exit code
+
+# 3) 安装（PowerShell；Git Bash 传 C:\ 绝对路径会被 hdc 拼错）
+& "D:\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe" install -r "C:\...\electron\build\default\outputs\default\electron-default-signed.hap"
+# 认 "install bundle successfully"
+
+# 4) 设备侧版本复核
+& "...\hdc.exe" shell bm dump -n com.hwt.echomusic
+```
+
+解包核验（PowerShell 的 `Add-Type` 可能被安全策略拦，用 Python 最稳）：
+
+```python
+import zipfile, json
+hap = r"C:\...\electron-default-signed.hap"
+need = [
+    "libs/arm64-v8a/libecho_screen_capture.so",
+    "resources/resfile/resources/CHANGELOG.md",
+    "resources/resfile/resources/app/CHANGELOG.md",
+    "resources/resfile/resources/server/util/set_cookie.js",
+]
+with zipfile.ZipFile(hap) as z:
+    names = set(z.namelist())
+    for n in need:
+        hit = [x for x in names if x.endswith(n)]
+        print(n, z.getinfo(hit[0]).file_size if hit else "!!! MISSING")
+    mod = json.loads(z.read([x for x in names if x.endswith("/module.json")][0]))
+    print("deviceTypes =", mod["module"]["deviceTypes"])
+    print("app version =", mod["app"]["versionCode"], mod["app"]["versionName"])
+```
+
+还应抽查：主进程 bundle 含 OHOS changelog 候选路径、`server/module/login_qq_qr_create.js`
+含 `collectCookies`、两份 CHANGELOG 均为 5297 B 且含 `## 1.3.0(1300232)`。
+**上传应用市场前务必确认 `module.json` 里 `app.versionName` 是 `1.3.0`（不带括号构建号）、
+`app.versionCode` 是 `1300232`** —— 上面脚本最后两行就是干这个的。
+
+### 20.6 安装后的功能验收清单
+
+| 功能 | 预期 |
+| --- | --- |
+| 关于页 | `Version 1.3.0(1300232)`；「上游项目源码」→ hoowhoami/EchoMusic，「项目源码」→ OHOS releases |
+| 设置 → 更新日志 | 显示 1.3.0(1300232) 完整日志，三个分组标题加粗变黑 |
+| 账号 → QQ 扫码登录 | 二维码正常出图，不再显示 `qrSetCookies.forEach is not a function` |
+| 播控中心 | 五元组「循环 / 上一首 / 播放暂停 / 下一首 / 收藏」，点击能控制应用且收藏变红、循环档位同步 |
+| 更多功能 → 投放 | 拉起系统「投播至」面板（STYLE_PANEL），能看到本机与蓝牙设备；投播成功后本机暂停 |
+| 听歌识曲 · 系统音频 | 弹「允许使用你的屏幕」，授权后能识别；不再出现黑白屏/卡死 |
+| 听歌识曲 · 麦克风 | 仍走 `AudioCapturer` + `MICROPHONE` 运行时授权 |
+| 设置 → 歌词 | 不再出现「桌面歌词」子分区；播放栏开关与桌面歌词仍可用 |
+| 实况窗 | 回桌面/锁屏后状态栏胶囊出现（依赖 `deviceTypes` 含 phone） |
+
+### 20.7 已知限制 / 未验收
+
+- **远端真实出声未验收**：投播面板弹出、设备列表（本机 / FreeClip 2）与 URL 发布均已真机验证，
+  但现场没有 TV / 音箱，真正推流到远端播放仍需在有多设备的环境复验。
+- **降级安装清空过数据**：`versionCode` 从 `3000001` 降到 `1300232` 时 `hdc install -r -d` 被中断，
+  旧包已卸、登录态/本地歌单/设置丢失，随后全新安装恢复。**以后保持 versionCode 单调递增**。
+  真要降级请用不卸载的方案，一次跑完别打断，先备份 `/data/app/el2/100/base/com.hwt.echomusic/`。
+- 悬浮歌词（`SYSTEM_FLOAT_WINDOW` 全局悬浮窗）尝试过但受控权限在调试签名下拿不到（9568289），
+  **已完整回退**为系统桌面歌词；不要在设置里找「悬浮歌词」。
+- 歌词简繁转换仍回退原文（缺 `echo-opencc`）；应用内更新检查关闭；全局快捷键关闭；仅 arm64-v8a。
+- 设备侧 `hdc shell` 用户无权遍历 `/data/app` 下的 resfile，资源校验只能解包 HAP +
+  依赖运行时 `__dirname` 相对路径（该思路已被 `server.ts` 真机验证）。
+
+### 20.8 备份与回退
+
+工程里保留的 `.bak-*` 文件（`.bak-sdk26.0.0`、`EntryAbility.ets.bak-api26`、
+`module.json5.bak-nosplit` 等）都是 2026-09 的历史备份，**不要用它们覆盖当前 API 26 代码**。
+本轮各阶段的载荷/配置快照在工作区 `_payload_bak/`、`_backup_v1.2.0/` 与两个发行 zip 里
+（`EchoMusic_OHOS_v1.2.0_upstream-v2.3.2.zip`、`EchoMusic_OHOS_v1.3.0_upstream-v2.3.2.zip`），
+需要整体回退时优先用这些，而不是逐个 `.bak` 拼。
